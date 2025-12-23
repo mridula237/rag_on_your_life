@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>RAG on Your Life</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>RAG on Your Life</h1>
+      <div class="subtitle">Upload a PDF, then ask questions.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <input id="fileInput" type="file" accept=".pdf,.txt" />
+        <button id="uploadBtn">Upload</button>
+      </div>
+      <div id="uploadStatus" class="subtitle" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card chatCard">
+      <div id="chat" class="chat"></div>
+
+      <div class="composer">
+        <input id="questionInput" type="text" placeholder="Ask something..." />
+        <button id="sendBtn">Ask</button>
+      </div>
+
+      <div id="sources" class="sources"></div>
+    </div>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
