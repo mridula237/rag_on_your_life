@@ -5,19 +5,17 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from app.ingestion.ingest import ingest_file
+from app.ingestion.ingest import ingest_pdf, save_upload
 from app.query.rag import answer_with_rag
 
-# Load .env from project root no matter where uvicorn is run
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
 
 STATIC_DIR = PROJECT_ROOT / "static"
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
+UPLOAD_DIR = Path("./uploads")
 
 app = FastAPI()
-
-# Mount static (this MUST exist)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 class AskRequest(BaseModel):
@@ -29,26 +27,19 @@ def home():
 
 @app.get("/favicon.ico")
 def favicon():
-    # avoid 404 spam
     return JSONResponse(status_code=204, content=None)
 
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
-    upload_dir = Path("uploads")
-    upload_dir.mkdir(exist_ok=True)
+    data = await file.read()
+    saved_path = save_upload(data, file.filename)
 
-    file_path = upload_dir / file.filename
-    file_path.write_bytes(await file.read())
+    try:
+        chunks_indexed = ingest_pdf(saved_path, file.filename)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
-    chunks_indexed = ingest_file(str(file_path), file.filename)
-
-    return {
-    "status": "ok",
-    "chunks_indexed": chunks_indexed,
-    "filename": file.filename
-}
-
-
+    return {"status": "ok", "filename": file.filename, "chunks_indexed": chunks_indexed}
 
 @app.post("/ask")
 async def ask(req: AskRequest):
@@ -56,3 +47,9 @@ async def ask(req: AskRequest):
         return answer_with_rag(req.query)
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.get("/files")
+def list_files():
+    if not UPLOAD_DIR.exists():
+        return []
+    return sorted([f.name for f in UPLOAD_DIR.iterdir() if f.is_file()])

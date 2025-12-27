@@ -1,35 +1,41 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RAG on Your Life</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>RAG on Your Life</h1>
-      <div class="subtitle">Upload a PDF, then ask questions.</div>
-    </div>
-
-    <div class="card">
-      <div class="row">
-        <input id="fileInput" type="file" accept=".pdf,.txt" />
-        <button id="uploadBtn">Upload</button>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebarHeader">
+        <h3>Uploaded Files</h3>
+        <button id="refreshFilesBtn" class="ghostBtn">↻</button>
       </div>
-      <div id="uploadStatus" class="subtitle" style="margin-top:10px;"></div>
-    </div>
+      <ul id="fileList" class="fileList"></ul>
+    </aside>
 
-    <div class="card chatCard">
+    <main class="main">
+      <h1 class="title">RAG on Your Life</h1>
+
       <div id="chat" class="chat"></div>
 
-      <div class="composer">
-        <input id="questionInput" type="text" placeholder="Ask something..." />
-        <button id="sendBtn">Ask</button>
-      </div>
-
       <div id="sources" class="sources"></div>
-    </div>
+
+      <div class="controls">
+        <div class="row">
+          <input id="questionInput" class="input" placeholder="Ask something..." />
+          <button id="sendBtn" class="btn">Ask</button>
+        </div>
+
+        <div class="row">
+          <input id="fileInput" type="file" accept="application/pdf" />
+          <button id="uploadBtn" class="btn">Upload PDF</button>
+          <span id="uploadStatus" class="status"></span>
+        </div>
+      </div>
+    </main>
   </div>
 
   <script src="/static/script.js"></script>

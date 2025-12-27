@@ -5,9 +5,11 @@ const sendBtn = document.getElementById("sendBtn");
 const fileInput = document.getElementById("fileInput");
 const uploadBtn = document.getElementById("uploadBtn");
 const uploadStatus = document.getElementById("uploadStatus");
-const sourcesDiv = document.getElementById("sources");
 
-let hasUploaded = false;
+const fileList = document.getElementById("fileList");
+const refreshFilesBtn = document.getElementById("refreshFilesBtn");
+
+const sourcesDiv = document.getElementById("sources");
 
 function addMessage(text, who) {
   const div = document.createElement("div");
@@ -24,7 +26,7 @@ function renderSources(sources) {
   }
 
   const items = sources
-    .map(s => `<li>${s.source || "unknown"}${s.page ? ` — page ${s.page}` : ""}</li>`)
+    .map(s => `<li>${s.source} — page ${s.page ?? "?"}</li>`)
     .join("");
 
   sourcesDiv.innerHTML = `
@@ -33,15 +35,29 @@ function renderSources(sources) {
   `;
 }
 
-uploadBtn.onclick = async () => {
+async function loadFiles() {
+  const res = await fetch("/files");
+  const files = await res.json();
+
+  fileList.innerHTML = "";
+  files.forEach(name => {
+    const li = document.createElement("li");
+    li.textContent = name;
+    fileList.appendChild(li);
+  });
+}
+
+refreshFilesBtn.addEventListener("click", loadFiles);
+
+uploadBtn.addEventListener("click", async () => {
   const file = fileInput.files[0];
   if (!file) {
-    uploadStatus.textContent = "Pick a file first.";
+    uploadStatus.textContent = "Pick a PDF first.";
     return;
   }
 
   uploadStatus.textContent = "Uploading + indexing...";
-  hasUploaded = false;
+  renderSources([]);
 
   const form = new FormData();
   form.append("file", file);
@@ -56,14 +72,14 @@ uploadBtn.onclick = async () => {
     }
 
     uploadStatus.textContent = `Indexed ${data.chunks_indexed} chunks from ${data.filename}`;
-    hasUploaded = true;
     addMessage(`✅ Uploaded: ${data.filename}`, "assistant");
+    await loadFiles();
   } catch (e) {
     uploadStatus.textContent = "Upload failed (network/server error).";
   }
-};
+});
 
-sendBtn.onclick = async () => {
+sendBtn.addEventListener("click", async () => {
   const question = input.value.trim();
   if (!question) return;
 
@@ -71,12 +87,11 @@ sendBtn.onclick = async () => {
   input.value = "";
   renderSources([]);
 
-  if (!hasUploaded) {
-    addMessage("⚠️ Upload a PDF first, then ask.", "assistant");
-    return;
-  }
-
-  addMessage("Thinking...", "thinking");
+  const thinking = document.createElement("div");
+  thinking.className = "msg thinking";
+  thinking.textContent = "Thinking...";
+  chat.appendChild(thinking);
+  chat.scrollTop = chat.scrollHeight;
 
   try {
     const res = await fetch("/ask", {
@@ -86,10 +101,7 @@ sendBtn.onclick = async () => {
     });
 
     const data = await res.json();
-
-    // remove "Thinking..."
-    const thinking = chat.querySelector(".msg.thinking");
-    if (thinking) thinking.remove();
+    thinking.remove();
 
     if (!res.ok) {
       addMessage(`Error: ${data.error || "unknown error"}`, "assistant");
@@ -99,8 +111,9 @@ sendBtn.onclick = async () => {
     addMessage(data.answer, "assistant");
     renderSources(data.sources);
   } catch (e) {
-    const thinking = chat.querySelector(".msg.thinking");
-    if (thinking) thinking.remove();
+    thinking.remove();
     addMessage("Error contacting backend.", "assistant");
   }
-};
+});
+
+loadFiles();
