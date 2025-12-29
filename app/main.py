@@ -18,16 +18,20 @@ UPLOAD_DIR = Path("./uploads")
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+
 class AskRequest(BaseModel):
     query: str
+
 
 @app.get("/", response_class=HTMLResponse)
 def home():
     return (TEMPLATES_DIR / "index.html").read_text(encoding="utf-8")
 
+
 @app.get("/favicon.ico")
 def favicon():
     return JSONResponse(status_code=204, content=None)
+
 
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
@@ -39,14 +43,26 @@ async def upload(file: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
-    return {"status": "ok", "filename": file.filename, "chunks_indexed": chunks_indexed}
+    return {
+        "status": "ok",
+        "filename": file.filename,
+        "chunks_indexed": chunks_indexed,
+    }
+
+
+from fastapi import HTTPException
 
 @app.post("/ask")
 async def ask(req: AskRequest):
     try:
         return answer_with_rag(req.query)
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+
 
 @app.get("/files")
 def list_files():
