@@ -7,4 +7,6 @@ openai
 numpy
 python-dotenv
 langchain-community
-langchain_openai
+langchain-openai
+faiss-cpu
+pypdf
