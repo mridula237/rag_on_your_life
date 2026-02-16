@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RAG on Your Life</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebarHeader">
+        <h3>Uploaded Files</h3>
+        <button id="refreshFilesBtn" class="ghostBtn">↻</button>
+      </div>
+      <ul id="fileList" class="fileList"></ul>
+    </aside>
+
+    <main class="main">
+      <h1 class="title">RAG on Your Life</h1>
+
+      <div id="chat" class="chat"></div>
+
+      <div id="sources" class="sources"></div>
+
+      <div class="controls">
+        <div class="row">
+          <input id="questionInput" class="input" placeholder="Ask something..." />
+          <button id="sendBtn" class="btn">Ask</button>
+        </div>
+
+        <div class="row">
+          <input id="fileInput" type="file" accept="application/pdf" />
+          <button id="uploadBtn" class="btn">Upload PDF</button>
+          <span id="uploadStatus" class="status"></span>
+        </div>
+      </div>
+      <label>
+        <input type="checkbox" id="crossDocumentToggle" />
+        Search across all documents
+      </label>
+      
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  
+  <script src="/static/script.js"></script>
+</body>
+</html>

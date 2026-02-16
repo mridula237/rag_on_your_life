@@ -1,0 +1,150 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: #0b0d14;
+  color: #fff;
+}
+
+.layout {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 260px;
+  background: #0f1117;
+  border-right: 1px solid #1f2333;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fileList {
+  padding: 0;
+  margin: 12px 0 0;
+  list-style: none;
+}
+
+.fileList li {
+  background: #1a1d2e;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.ghostBtn {
+  background: transparent;
+  border: 1px solid #2a2f45;
+  color: #cdd3ff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.main {
+  flex: 1;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+}
+
+.chat {
+  flex: 1;
+  background: #12162a;
+  border: 1px solid #1f2333;
+  border-radius: 14px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.msg {
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  max-width: 900px;
+  line-height: 1.35;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.msg.user {
+  background: #4f46e5;
+  margin-left: auto;
+}
+
+.msg.assistant {
+  background: #1b2038;
+}
+
+.msg.thinking {
+  opacity: 0.7;
+  font-style: italic;
+  background: #1b2038;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #2a2f45;
+  background: #0f1117;
+  color: white;
+}
+
+.btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  background: #4f46e5;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.status {
+  opacity: 0.85;
+  font-size: 13px;
+}
+
+.sources {
+  background: #0f1117;
+  border: 1px solid #1f2333;
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+.sourcesTitle {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.sourcesList {
+  margin: 0;
+  padding-left: 18px;
+}
