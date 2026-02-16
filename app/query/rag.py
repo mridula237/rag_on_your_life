@@ -2,7 +2,7 @@ from typing import List, Tuple
 import time
 
 from langchain_openai import ChatOpenAI
-from langchain.schema import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 from app.logger import log_query
 
 
