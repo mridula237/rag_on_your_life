@@ -1,12 +1,10 @@
 fastapi
 uvicorn
-jinja2
-python-multipart
-PyPDF2
-openai
-numpy
 python-dotenv
+langchain
 langchain-community
 langchain-openai
 faiss-cpu
 pypdf
+openai
+tiktoken
