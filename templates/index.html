@@ -21,7 +21,10 @@
 
       <div id="chat" class="chat"></div>
 
-      <div id="sources" class="sources"></div>
+      <div class="sourcesPanel">
+        <div class="sourcesTitle">Sources</div>
+        <ul id="sources" class="sources"></ul>
+      </div>
 
       <div class="controls">
         <div class="row">
@@ -34,17 +37,15 @@
           <button id="uploadBtn" class="btn">Upload PDF</button>
           <span id="uploadStatus" class="status"></span>
         </div>
+
+        <label class="checkboxRow">
+          <input type="checkbox" id="crossDocumentToggle" checked />
+          Search across all documents
+        </label>
       </div>
-      <label>
-        <input type="checkbox" id="crossDocumentToggle" />
-        Search across all documents
-      </label>
-      
     </main>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-  
+
   <script src="/static/script.js"></script>
 </body>
 </html>

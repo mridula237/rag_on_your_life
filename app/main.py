@@ -1,95 +1,105 @@
-from pathlib import Path
-from typing import Optional, List
-
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, UploadFile, File, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from dotenv import load_dotenv
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
 
-from app.ingestion.ingest import ingest_pdf, save_upload, UPLOAD_DIR
-from app.query.rag import answer_with_rag
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage
+
+from app.ingestion.ingest import save_upload, ingest_pdf
+from app.query.search import search_documents
 from dotenv import load_dotenv
 load_dotenv()
-
-# ✅ CREATE APP ONCE
 app = FastAPI()
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 
-class QueryRequest(BaseModel):
-    query: str
-    source: Optional[str] = None
-    cross_document: bool = False
+# ==============================
+# Home
+# ==============================
+@app.get("/")
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.get("/", response_class=HTMLResponse)
-def home():
-    with open("templates/index.html", "r", encoding="utf-8") as f:
-        return f.read()
-
-
+# ==============================
+# Upload PDF
+# ==============================
 @app.post("/upload")
-async def upload(file: UploadFile = File(...)):
-    try:
-        if not file.filename.lower().endswith(".pdf"):
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "error": "Only PDF files are allowed."},
-            )
+async def upload_pdf(file: UploadFile = File(...)):
 
-        file_bytes = await file.read()
-        saved_path = save_upload(file_bytes, file.filename)
+    contents = await file.read()
+    path = save_upload(contents, file.filename)
+    chunks = ingest_pdf(str(path), file.filename)
 
-        chunks_indexed = ingest_pdf(saved_path, file.filename)
-
-        return {
-            "status": "ok",
-            "filename": file.filename,
-            "chunks_indexed": chunks_indexed,
-        }
-
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "error": str(e)},
-        )
+    return JSONResponse({
+        "filename": file.filename,
+        "chunks_indexed": chunks
+    })
 
 
+# ==============================
+# List Uploaded Files
+# ==============================
 @app.get("/files")
-def list_files() -> List[str]:
-    if not UPLOAD_DIR.exists():
-        return []
-    return sorted(
-        [
-            p.name
-            for p in UPLOAD_DIR.iterdir()
-            if p.is_file() and p.suffix.lower() == ".pdf"
-        ]
-    )
+async def list_files():
+    files = [f.name for f in UPLOAD_DIR.glob("*.pdf")]
+    return {"files": files}
 
 
+# ==============================
+# Query (NON-STREAMING)
+# ==============================
 @app.post("/query")
-async def query(
-    question: str = Form(...),
-    source: Optional[str] = Form(None),
-    cross_document: bool = Form(False),
-):
-    if not question.strip():
-        return JSONResponse(
-            status_code=400,
-            content={"detail": "Question is required"},
-        )
+async def query(data: dict):
 
-    answer, sources, confidence  = answer_with_rag(
-        question,
-        source,
-        cross_document,
-    )
+    query_text = data.get("query")
+    search_all = data.get("search_all", False)
+
+    if not query_text:
+        return {"answer": "No query provided.", "sources": []}
+
+    # Retrieve relevant chunks
+    results = search_documents(query_text, search_all)
+
+    if not results:
+        return {"answer": "No relevant information found.", "sources": []}
+
+    # Build context from retrieved documents
+    context = "\n\n".join([doc.page_content for doc in results])
+
+    prompt = f"""
+    Use the following context to answer the question.
+
+    Context:
+    {context}
+
+    Question:
+    {query_text}
+
+    Answer clearly and concisely.
+    """
+
+    response = llm.invoke([HumanMessage(content=prompt)])
+
+    # Extract sources
+    sources = []
+    for doc in results:
+        sources.append({
+            "source": doc.metadata.get("source", "Unknown"),
+            "page": doc.metadata.get("page", "N/A")
+        })
 
     return {
-    "answer": answer,
-    "sources": sources,
-    "confidence": confidence,
-}
+        "answer": response.content,
+        "sources": sources
+    }

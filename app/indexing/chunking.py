@@ -1,21 +1,26 @@
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 100):
-    """
-    Returns:
-      [{"chunk_index": 0, "text": "..."}, {"chunk_index": 1, "text": "..."}]
-    Chunking is word-based (simple + reliable).
-    """
-    words = text.split()
-    chunks = []
+from __future__ import annotations
+from typing import List
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 
-    start = 0
-    idx = 0
+def chunk_documents(
+    docs: List[Document],
+    chunk_size: int = 900,
+    overlap: int = 150,
+) -> List[Document]:
 
-    while start < len(words):
-        end = start + chunk_size
-        chunk = " ".join(words[start:end]).strip()
-        if chunk:
-            chunks.append({"chunk_index": idx, "text": chunk})
-            idx += 1
-        start += max(1, chunk_size - overlap)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=overlap,
+        separators=["\n\n", "\n", " ", ""],
+    )
+
+    chunks: List[Document] = []
+
+    for d in docs:
+        split_docs = splitter.split_documents([d])
+        for c in split_docs:
+            c.metadata = dict(d.metadata or {}) | dict(c.metadata or {})
+            chunks.append(c)
 
     return chunks

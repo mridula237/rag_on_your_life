@@ -1,11 +1,11 @@
 fastapi
-uvicorn
+uvicorn[standard]
 python-dotenv
+jinja2
+
 langchain
-langchain-community
 langchain-openai
-faiss-cpu
+langchain-community
+
 pypdf
-openai
-tiktoken
-python-multipart
+faiss-cpu

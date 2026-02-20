@@ -1,24 +1,24 @@
-# Virtual environment
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
 .venv/
 venv/
 
-# Python cache
-__pycache__/
-*.pyc
-
-# Environment variables
-.env
-
-# Vector store + databases
-vector_store/
-vectorstore/
-chroma_db/
-
 # Logs
 logs/
+*.log
 
-# Uploaded files
+# Data
 uploads/
+chroma_db/
+vector_store/
+
+# Env
+.env
 
 # Mac
 .DS_Store

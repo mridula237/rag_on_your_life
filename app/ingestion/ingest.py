@@ -1,36 +1,37 @@
 from pathlib import Path
-
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from app.indexing.vector_store import get_vector_store, persist_vector_store
 
-from app.indexing.vector_store import get_vector_store
-
-UPLOAD_DIR = Path("uploads")
+BASE_DIR = Path(__file__).resolve().parents[2]
+UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 
 def save_upload(file_bytes: bytes, filename: str) -> Path:
     path = UPLOAD_DIR / filename
-    path.write_bytes(file_bytes)
+    with open(path, "wb") as f:
+        f.write(file_bytes)
     return path
 
 
-def ingest_pdf(path: Path, source_name: str) -> int:
-    loader = PyPDFLoader(str(path))
-    documents = loader.load()
+def ingest_pdf(file_path: str, filename: str) -> int:
+    """
+    Ingest a PDF file, attach metadata, and store embeddings.
+    """
 
-    for doc in documents:
-        doc.metadata["source"] = source_name
+    loader = PyPDFLoader(file_path)
+    docs = loader.load()
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-    )
+    if not docs:
+        return 0
 
-    chunks = splitter.split_documents(documents)
+    # 🔥 Attach clean metadata for filtering later
+    for doc in docs:
+        doc.metadata["source"] = filename
 
-    vectorstore = get_vector_store()
-    vectorstore.add_documents(chunks)
-    vectorstore.save_local("vector_store")
+    vector_store = get_vector_store()
+    vector_store.add_documents(docs)
 
-    return len(chunks)
+    persist_vector_store(vector_store)
+
+    return len(docs)

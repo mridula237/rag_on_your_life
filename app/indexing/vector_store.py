@@ -1,30 +1,21 @@
-from pathlib import Path
+from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
+from pathlib import Path
 
-VECTOR_DIR = Path("vector_store")
-VECTOR_DIR.mkdir(exist_ok=True)
+BASE_DIR = Path(__file__).resolve().parents[2]
+CHROMA_DIR = BASE_DIR / "chroma_db"
 
-_embeddings = None
-_vectorstore = None
+CHROMA_DIR.mkdir(exist_ok=True)
 
 
 def get_vector_store():
-    global _embeddings, _vectorstore
+    embeddings = OpenAIEmbeddings()
 
-    if _vectorstore is not None:
-        return _vectorstore
+    return Chroma(
+        persist_directory=str(CHROMA_DIR),
+        embedding_function=embeddings
+    )
 
-    _embeddings = OpenAIEmbeddings()
 
-    if (VECTOR_DIR / "index.faiss").exists():
-        _vectorstore = FAISS.load_local(
-            VECTOR_DIR,
-            _embeddings,
-            allow_dangerous_deserialization=True,
-        )
-    else:
-        _vectorstore = FAISS.from_texts([], _embeddings)
-        _vectorstore.save_local(VECTOR_DIR)
-
-    return _vectorstore
+def persist_vector_store(vector_store):
+    vector_store.persist()

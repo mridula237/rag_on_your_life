@@ -1,168 +1,169 @@
-function stringifyError(err) {
-  if (!err) return "Unknown error";
-  if (typeof err === "string") return err;
-  return JSON.stringify(err, null, 2);
+let activeFile = null;
+
+/* ===========================
+   Upload PDF
+=========================== */
+
+document.getElementById("uploadBtn").addEventListener("click", uploadPDF);
+
+async function uploadPDF() {
+    const fileInput = document.getElementById("fileInput");
+    const status = document.getElementById("uploadStatus");
+
+    if (!fileInput.files.length) {
+        status.textContent = "Select a file first.";
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+
+    status.textContent = "Uploading...";
+
+    try {
+        const response = await fetch("/upload", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        activeFile = data.filename;
+
+        await refreshFileList();
+        highlightActiveFile(activeFile);
+
+        status.textContent = `Uploaded ${data.filename} (${data.chunks_indexed} chunks)`;
+        fileInput.value = "";
+    } catch (err) {
+        console.error(err);
+        status.textContent = "Upload failed.";
+    }
 }
 
+/* ===========================
+   File List Handling
+=========================== */
 
-const chat = document.getElementById("chat");
-const input = document.getElementById("questionInput");
-const sendBtn = document.getElementById("sendBtn");
+document.getElementById("refreshFilesBtn").addEventListener("click", refreshFileList);
 
-const fileInput = document.getElementById("fileInput");
-const uploadBtn = document.getElementById("uploadBtn");
-const uploadStatus = document.getElementById("uploadStatus");
+async function refreshFileList() {
+    try {
+        const response = await fetch("/files");
+        const data = await response.json();
 
-const fileList = document.getElementById("fileList");
-const refreshFilesBtn = document.getElementById("refreshFilesBtn");
+        const fileList = document.getElementById("fileList");
+        fileList.innerHTML = "";
 
-const sourcesDiv = document.getElementById("sources");
-const crossToggle = document.getElementById("crossDocumentToggle");
+        data.files.forEach(filename => {
+            const li = document.createElement("li");
+            li.textContent = filename;
+            li.className = "fileItem";
 
-let selectedFile = null;
+            li.onclick = () => {
+                activeFile = filename;
+                highlightActiveFile(filename);
+            };
 
-/* ---------- UI helpers ---------- */
-function addMessage(text, who) {
-  const div = document.createElement("div");
-  div.className = `msg ${who}`;
-  div.innerHTML = marked.parse(text);
+            fileList.appendChild(li);
+        });
 
-  if (window.MathJax) MathJax.typesetPromise([div]);
-
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+    } catch (err) {
+        console.error(err);
+    }
 }
 
-function renderSources(sources) {
-  if (!sources || sources.length === 0) {
-    sourcesDiv.innerHTML = "";
-    return;
-  }
+function highlightActiveFile(filename) {
+    const items = document.querySelectorAll(".fileItem");
 
-  const items = sources
-    .map((s) => `<li>${s.source} — page ${s.page ?? "?"}</li>`)
-    .join("");
+    items.forEach(item => {
+        item.classList.remove("activeFile");
 
-  sourcesDiv.innerHTML = `
-    <div class="sourcesTitle">Sources</div>
-    <ul class="sourcesList">${items}</ul>
-  `;
-}
-
-/* ---------- Files ---------- */
-async function loadFiles() {
-  try {
-    const res = await fetch("/files");
-    const files = await res.json();
-
-    fileList.innerHTML = "";
-
-    files.forEach((name) => {
-      const li = document.createElement("li");
-      li.textContent = name;
-
-      li.onclick = () => {
-        selectedFile = name;
-        document.querySelectorAll("#fileList li").forEach((el) => el.classList.remove("active"));
-        li.classList.add("active");
-      };
-
-      fileList.appendChild(li);
+        if (item.textContent === filename) {
+            item.classList.add("activeFile");
+        }
     });
-
-    if (selectedFile) {
-      [...fileList.querySelectorAll("li")].forEach((li) => {
-        if (li.textContent === selectedFile) li.classList.add("active");
-      });
-    }
-  } catch (e) {
-    console.error(e);
-  }
 }
 
-refreshFilesBtn.addEventListener("click", loadFiles);
+/* ===========================
+   Ask Question
+=========================== */
 
-/* ---------- Upload ---------- */
-uploadBtn.addEventListener("click", async () => {
-  const file = fileInput.files[0];
-  if (!file) {
-    uploadStatus.textContent = "Pick a PDF first.";
-    return;
-  }
+document.getElementById("sendBtn").addEventListener("click", askQuestion);
 
-  uploadStatus.textContent = "Uploading + indexing...";
-  renderSources([]);
+async function askQuestion() {
+    const questionInput = document.getElementById("questionInput");
+    const chat = document.getElementById("chat");
+    const sourcesList = document.getElementById("sources");
+    const crossDocument = document.getElementById("crossDocumentToggle").checked;
 
-  const form = new FormData();
-  form.append("file", file);
+    const question = questionInput.value.trim();
+    if (!question) return;
 
-  try {
-    const res = await fetch("/upload", { method: "POST", body: form });
-    const data = await res.json();
+    // Add user message
+    appendMessage("You", question);
 
-    if (!res.ok || data.status === "error") {
-      addMessage(
-        `❌ Backend error:\n\`\`\`json\n${stringifyError(data.error)}\n\`\`\``,
-        "assistant"
-      );
-      return;
+    questionInput.value = "";
+
+    appendMessage("AI", "Thinking...");
+
+    try {
+        const response = await fetch("/query", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                query: question,
+                search_all: crossDocument
+            })
+        });
+
+        const data = await response.json();
+
+        // Replace "Thinking..."
+        replaceLastAIMessage(data.answer || "No response.");
+
+        // Render sources
+        sourcesList.innerHTML = "";
+        if (data.sources) {
+            data.sources.forEach(src => {
+                const li = document.createElement("li");
+                li.textContent = `${src.source} — page ${src.page}`;
+                sourcesList.appendChild(li);
+            });
+        }
+
+    } catch (err) {
+        console.error(err);
+        replaceLastAIMessage("Error processing request.");
     }
-    
+}
 
-    uploadStatus.textContent = `Indexed ${data.chunks_indexed} chunks from ${data.filename}`;
-    addMessage(`✅ Uploaded: ${data.filename}`, "assistant");
+/* ===========================
+   Chat Helpers
+=========================== */
 
-    selectedFile = data.filename;
-    await loadFiles();
-  } catch (e) {
-    console.error(e);
-    uploadStatus.textContent = "Upload failed (server error).";
-    addMessage(`❌ Backend error:\n\`\`\`json\n${stringifyError(data.error)}\n\`\`\``, "assistant");
+function appendMessage(sender, text) {
+    const chat = document.getElementById("chat");
 
-  }
-});
+    const messageDiv = document.createElement("div");
+    messageDiv.className = sender === "You" ? "message user" : "message ai";
 
-/* ---------- Ask ---------- */
-sendBtn.addEventListener("click", async () => {
-  const question = input.value.trim();
-  if (!question) return;
+    messageDiv.innerHTML = `<strong>${sender}:</strong><br>${text}`;
 
-  addMessage(question, "user");
-  input.value = "";
-  renderSources([]);
+    chat.appendChild(messageDiv);
+    chat.scrollTop = chat.scrollHeight;
+}
 
-  const thinking = document.createElement("div");
-  thinking.className = "msg thinking";
-  thinking.textContent = "Thinking...";
-  chat.appendChild(thinking);
+function replaceLastAIMessage(text) {
+    const messages = document.querySelectorAll(".message.ai");
+    if (messages.length === 0) return;
 
-  const form = new FormData();
-  form.append("question", question);
-  form.append("source", selectedFile);
-  form.append(
-    "cross_document",
-    document.getElementById("crossDocumentToggle").checked
-  );
+    messages[messages.length - 1].innerHTML = `<strong>AI:</strong><br>${text}`;
+}
 
-  try {
-    const res = await fetch("/query", {
-      method: "POST",
-      body: form,
-    });
+/* ===========================
+   Initialize
+=========================== */
 
-    const data = await res.json();
-    thinking.remove();
-
-    if (!res.ok) {
-      addMessage(`❌ ${data.detail}`, "assistant");
-      return;
-    }
-
-    addMessage(data.answer, "assistant");
-    renderSources(data.sources);
-
-  } catch (e) {
-    thinking.remove();
-    addMessage("❌ Server error", "assistant");
-  }
-});
+refreshFileList();

@@ -1,21 +1,22 @@
-from typing import List, Optional
+from typing import List
 from langchain_core.documents import Document
 from app.indexing.vector_store import get_vector_store
 
 
-def semantic_search(
-    query: str,
-    source: Optional[str] = None,
-    cross_document: bool = False,
-    k: int = 6,
-) -> List[Document]:
-    store = get_vector_store()
+def search_documents(query: str, search_all: bool = False, k: int = 5) -> List[Document]:
+    """
+    Retrieve relevant documents from vector store.
+    """
 
-    if cross_document or not source:
-        return store.similarity_search(query, k=k)
+    vector_store = get_vector_store()
 
-    return store.similarity_search(
-        query,
-        k=k,
-        filter={"source": source}
-    )
+    if search_all:
+        results = vector_store.similarity_search(query, k=k)
+    else:
+        # When not searching across all documents,
+        # rely on metadata filtering from frontend logic
+        # (you can later extend this with active file tracking if needed)
+
+        results = vector_store.similarity_search(query, k=k)
+
+    return results

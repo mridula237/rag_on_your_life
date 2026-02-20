@@ -1,109 +1,106 @@
-from typing import List, Tuple
-import time
+import os
+import json
+from dotenv import load_dotenv
+from typing import Optional
+import numpy as np
 
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from app.logger import log_query
-
-
 from app.indexing.vector_store import get_vector_store
 
+load_dotenv()
 
-# 🔹 LLM configuration
 llm = ChatOpenAI(
     model="gpt-4o-mini",
     temperature=0,
+    api_key=os.getenv("OPENAI_API_KEY"),
+    streaming=True
 )
 
 
-def retrieve_documents(
-    query: str,
-    source: str | None,
-    cross_document: bool,
-):
-    """
-    Retrieves top-k relevant documents along with similarity scores.
-    """
+# --------------------------------------------------
+# SSE helper
+# --------------------------------------------------
+def sse(event: str, data) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+# --------------------------------------------------
+# Retrieve documents
+# --------------------------------------------------
+def retrieve_documents(query: str, selected_file: Optional[str], search_all: bool, k: int = 6):
     vector_store = get_vector_store()
 
     if vector_store is None:
-        return []
+        return [], [], 0.0
 
-    if source and not cross_document:
-        docs_with_scores = vector_store.similarity_search_with_score(
-            query,
-            k=5,
-            filter={"source": source},
-        )
+    docs_with_scores = vector_store.similarity_search_with_score(query, k=k)
+
+    filtered_docs = []
+    scores = []
+
+    for doc, score in docs_with_scores:
+        source_file = doc.metadata.get("source", "unknown")
+
+        if not search_all and selected_file:
+            if source_file != selected_file:
+                continue
+
+        filtered_docs.append(doc)
+        scores.append(float(score))
+
+    if scores:
+        avg_score = float(np.mean(scores))
+        confidence = round(1 / (1 + avg_score), 3)
     else:
-        docs_with_scores = vector_store.similarity_search_with_score(
-            query,
-            k=5,
-        )
+        confidence = 0.0
 
-    return docs_with_scores
+    return filtered_docs, confidence
 
 
-def answer_with_rag(
-    query: str,
-    source: str | None = None,
-    cross_document: bool = False,
-) -> Tuple[str, List[str], float]:
+# --------------------------------------------------
+# Streaming Answer
+# --------------------------------------------------
+def answer_with_rag_stream(query: str, selected_file=None, search_all=False):
 
-    start_time = time.time()
+    try:
+        docs, confidence = retrieve_documents(query, selected_file, search_all)
 
-    docs_with_scores = retrieve_documents(query, source, cross_document)
+        if not docs:
+            yield sse("error", {"message": "No relevant documents found."})
+            return
 
-    if not docs_with_scores:
-        return "I don't know.", [], 0.0
+        context = "\n\n".join([doc.page_content for doc in docs])
 
-    docs = [d[0] for d in docs_with_scores]
-    scores = [d[1] for d in docs_with_scores]
+        yield sse("thinking", {"status": "Analyzing documents..."})
 
-    # 🔥 Convert FAISS distance to confidence
-    # Lower score = better match in FAISS (L2 distance)
-    # We invert it for easier interpretation
-    avg_distance = sum(scores) / len(scores)
-    confidence = round(1 / (1 + avg_distance), 3)
+        prompt = f"""
+You are a helpful AI assistant.
 
-    # 🔥 Threshold
-    if confidence < 0.2:
-        return "I don't know.", [], confidence
+Answer using ONLY the context below.
+If the answer is not in the context, say you don't know.
 
-    context = "\n\n".join(d.page_content for d in docs)
+Context:
+{context}
 
-    messages = [
-        SystemMessage(
-            content=(
-                "You are a document reasoning assistant. "
-                "Answer ONLY using the provided context. "
-                "If the answer is not explicitly supported by the context, respond with 'I don't know.'"
-            )
-        ),
-        HumanMessage(
-            content=f"Context:\n{context}\n\nQuestion:\n{query}"
-        ),
-    ]
+Question:
+{query}
+"""
 
-    response = llm.invoke(messages)
-    answer = response.content if hasattr(response, "content") else str(response)
+        response = llm.stream(prompt)
 
-    latency = round(time.time() - start_time, 3)
+        for chunk in response:
+            if chunk.content:
+                yield sse("token", {"token": chunk.content})
 
-    print(f"RAG latency: {latency}s | Confidence: {confidence}")
+        # Send sources cleanly
+        yield sse("sources", {
+            "sources": [
+                f"{doc.metadata.get('source', 'unknown')} — page {doc.metadata.get('page', '?')}"
+                for doc in docs
+            ]
+        })
 
-    log_query(
-        query=query,
-        answer=answer,
-        confidence=confidence,
-        latency=latency,
-        sources=sources,
-)
+        yield sse("done", {"confidence": confidence})
 
-
-    sources = sorted({
-        f"{d.metadata.get('source', 'unknown')} – page {d.metadata.get('page', '?')}"
-        for d in docs
-    })
-
-    return answer, sources, confidence
+    except Exception as e:
+        yield sse("error", {"message": str(e)})
